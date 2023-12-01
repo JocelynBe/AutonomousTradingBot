@@ -17,7 +17,7 @@ As of today, the model does not perform well on the forward test. It has a tende
 Current working hypotheses:
 1. The input signal is insufficient to make the right decision
 2. The exchange fees are too high given the signal available
-3. The loss function is not well suited to the problem (anti-diagonal fee penalty)
+3. The loss function is not well suited to the problem (exponential anti-diagonal fee penalty)
 
 
 ## Loss functions
@@ -56,3 +56,4 @@ Interestingly, we can find the optimal decisions for the above formula by consid
 The nodes are the values of the portfolio at each time step, and the edges are the conversion rates (including fees) between two consecutive time steps.
 By taking the log of the weights, the optimal decisions are obtained by finding the shortest weighted path from the initial value to the final value. The log allows to go from the multiplication to a sum, which I think is an elegant trick.
 
+I then tried to train the model to match the realized portfolio from the oracle decisions (instead of the transitions which are two noisy).
