@@ -57,3 +57,7 @@ The nodes are the values of the portfolio at each time step, and the edges are t
 By taking the log of the weights, the optimal decisions are obtained by finding the shortest weighted path from the initial value to the final value. The log allows to go from the multiplication to a sum, which I think is an elegant trick.
 
 I then tried to train the model to match the realized portfolio from the oracle decisions (instead of the transitions which are two noisy).
+
+# License
+
+All rights reserved. Do not use without permission.
