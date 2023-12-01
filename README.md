@@ -1,72 +1,58 @@
-# highfrek
+# Autonomous Trading Agent Project
 
-## Install
+This is a side project I have been working on for about a year. 
+My goal is to create a trading bot able to autonomously trade any asset, although I have been working with market data from the Binance platform.
 
-### Ubuntu
-To install on Ubuntu, first run the install.sh script.
+I have implemented everything from the ETL pipeline to the forward test framework and trading agent.
 
-### MacOs
-You will need python 3.10. Create a new venv and install the requirements:
+The model itself is implemented in PyTorch, based on a LSTM and custom reward functions.
 
-```
-python3 -m venv venv
-source venv/bin/activate
+Here are the key ideas I have so far implemented:
+* Price normalization to avoid over-fitting
+* Leveraged a third party package to compute 300+ technical indicators
+* Loss function that reflects exactly the actions of the agent on the system (ignoring trading volume)
+* Perfect oracle target to fine-tune the model with
 
-pip install wheel
-pip install -r requirements.txt
-```
-
-Remember to activate your environment before launching a jupyter notebook.
-
-## Getting started
-
-In your jupyter notebook or jupyter lab, you can run the following to setup:
-
-```
-%load_ext autoreload
-%autoreload 2
+As of today, the model does not perform well on the forward test. It has a tendency to converge towards not taking any action.
+Current working hypotheses:
+1. The input signal is insufficient to make the right decision
+2. The exchange fees are too high given the signal available
+3. The loss function is not well suited to the problem (anti-diagonal fee penalty)
 
 
-import os
-import sys
+## Loss functions
 
-module_path = os.path.abspath(os.path.join('../../highfrek'))
-if module_path not in sys.path:
-    sys.path.append(module_path)
-```
-### Loading data
+### Portfolio value after actions
 
-To load a pickle file, simply use the `load` util function:
+We define the fees matrix $\mathbf{F}$ as:
 
-```
-from utils.io_utils import load
-features = load(os.path.join(data_dir, 'features.pkl'))
-candles = load(os.path.join(data_dir, 'candles.pkl'))
-aligned_slices = load(os.path.join(data_dir, 'aligned_slices.pkl'))
+```math
+\mathbf{F}_{i, j} = 1 \text{ if } i = j \text{ else } (1 - \eta)
 ```
 
-# Theoretical introduction
+then the conversion rate from currency i to j at time step n:
+```math
+\mathbf{C}^n_{i, j} = \left(\mathbf{P}^n_{i, j}\right)^{-1}
+```
 
-## Concepts
+and finally the decision matrix $\mathbf{D}^n$ as:
+```math
+\mathbf{D}^n_{i, j} = \text{proportion of currency i being transferred to currency j at step n}
+```
 
-### Agent
+This decision matrix is the output of the ML model.
 
-An agent receives at a fixed frequency the latest state of the world.
-This state is made out of:
-* The last candle for the time series (open, close, low, high, volume at t)
-* The current repartition of the portfiolo (amount of usd and btc owned at t)
+Finally, the value of the porfolio at time step n, given the initial value $p^0$ is:
 
-It outputs a decision after receiving those two values. 
-For details about the architecture of the class see `agents.abstract.AbstractAgent`
+```math
+p^n = (p^0)^\top \cdot \prod_{k=0}^{n-1} \mathbf{F} \odot \mathbf{C}^k \odot \mathbf{D}^k
+```
 
-See `documentation/theory.md` for an explanation of the core ideas of the mathematical modelisation.
+The model is trained to maximize $p^n$ by adjusting its decisions $\mathbf{D}^k$.
 
+### Oracle target
 
-### Exchange
-
-The Agent interacts with the exchange, putting in trades that the exchange then puts on the market.
-The market dictates whether the transaction goes through or not. 
-See `exchange_api.abstract.AbstractExchangeAPI` for details about the implementation.
-
-
+Interestingly, we can find the optimal decisions for the above formula by considering the directed graph corresponding to the product of matrices.
+The nodes are the values of the portfolio at each time step, and the edges are the conversion rates (including fees) between two consecutive time steps.
+By taking the log of the weights, the optimal decisions are obtained by finding the shortest weighted path from the initial value to the final value. The log allows to go from the multiplication to a sum, which I think is an elegant trick.
 
